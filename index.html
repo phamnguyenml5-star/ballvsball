@@ -431,7 +431,7 @@ function openTransport(n,code,host,onOpen,onErr){
  const closers=[];let settled=false,dead=false,mqStarted=false;
  n.t={send:null,close:()=>{dead=true;closers.forEach(f=>{try{f()}catch(e){}})}};
  const fail=m=>{if(dead||settled)return;n.t.close();onErr(m)};
- const opened=snd=>{if(dead||settled)return false;settled=true;n.t.send=snd;onOpen();return true};
+ const opened=(snd,via)=>{if(dead||settled)return false;settled=true;n.t.send=snd;n.via=via;onOpen();return true};
  function startMQ(){
   if(mqStarted||dead||settled)return;mqStarted=true;
   if(!window.mqtt){
@@ -440,8 +440,8 @@ function openTransport(n,code,host,onOpen,onErr){
    closers.push(()=>{clearInterval(iv);ch.close()});
    const snd=d=>ch.postMessage(d);
    ch.onmessage=e=>{const d=e.data;if(net!==n)return;
-    if(host&&d.k==='hello'&&!open){open=true;ch.postMessage({k:'welcome'});opened(snd)}
-    else if(!host&&d.k==='welcome'&&!open){open=true;clearInterval(iv);opened(snd)}
+    if(host&&d.k==='hello'&&!open){open=true;ch.postMessage({k:'welcome'});opened(snd,'local')}
+    else if(!host&&d.k==='welcome'&&!open){open=true;clearInterval(iv);opened(snd,'local')}
     else if(open&&d.k!=='hello'&&d.k!=='welcome')onData(d)};
    if(!host)iv=setInterval(()=>ch.postMessage({k:'hello'}),400);
    return}
@@ -453,8 +453,8 @@ function openTransport(n,code,host,onOpen,onErr){
    let o;try{o=JSON.parse(raw)}catch(e){return}
    if(!o||!o.d||o.f===uid)return;const d=o.d;
    if(!pid){
-    if(host&&d.k==='hello'&&!settled){pid=o.f;lastQ=o.q;pub({k:'welcome',to:pid});if(!opened(snd))pid=null}
-    else if(!host&&d.k==='welcome'&&d.to===uid&&!settled){pid=o.f;lastQ=o.q;clearInterval(hi);if(!opened(snd))pid=null}
+    if(host&&d.k==='hello'&&!settled){pid=o.f;lastQ=o.q;pub({k:'welcome',to:pid});if(!opened(snd,'relay'))pid=null}
+    else if(!host&&d.k==='welcome'&&d.to===uid&&!settled){pid=o.f;lastQ=o.q;clearInterval(hi);if(!opened(snd,'relay'))pid=null}
     return}
    if(o.f!==pid||o.q<=lastQ)return;lastQ=o.q;
    if(d.k==='hello'){if(host)pub({k:'welcome',to:pid});return}
@@ -472,13 +472,13 @@ function openTransport(n,code,host,onOpen,onErr){
   let pr=null;
   try{pr=new Peer(host?id:undefined,{config:{iceServers:ICE}});closers.push(()=>pr.destroy())}catch(e){pr=null}
   if(pr){
-   const attach=c=>{c.on('open',()=>{if(opened(d=>{try{c.send(d)}catch(e){}})){c.on('data',onData);c.on('close',onClose);c.on('error',onClose)}else{try{c.close()}catch(e){}}})};
+   const attach=c=>{c.on('open',()=>{if(opened(d=>{try{if(d.k==='s'&&c.dataChannel&&c.dataChannel.bufferedAmount>24000)return;c.send(d)}catch(e){}},'p2p')){c.on('data',onData);c.on('close',onClose);c.on('error',onClose)}else{try{c.close()}catch(e){}}})};
    pr.on('error',e=>{if(host&&e.type==='unavailable-id')fail('Mã bị trùng, hãy thử lại.');else startMQ()});
    if(host)pr.on('connection',attach);
    else pr.on('open',()=>{const c=pr.connect(id,{serialization:'json',reliable:true});attach(c)})}
  }
  if(host)startMQ();
- else{const t1=setTimeout(startMQ,window.Peer?6000:0),t2=setTimeout(()=>fail('Không vào được phòng '+code+'. Kiểm tra mã phòng và mạng rồi thử lại.'),25000);closers.push(()=>{clearTimeout(t1);clearTimeout(t2)})}}
+ else{const t1=setTimeout(startMQ,window.Peer?8000:0),t2=setTimeout(()=>fail('Không vào được phòng '+code+'. Kiểm tra mã phòng và mạng rồi thử lại.'),25000);closers.push(()=>{clearTimeout(t1);clearTimeout(t2)})}}
 function peerGone(n){if(net!==n||mode==='over'||mode==='lobby')return;mode='over';ovShow('<h2>Bạn bè đã thoát</h2><button class="b" id="hm">VỀ SẢNH</button>');$('hm').onclick=lobby}
 function netPick(){mode='netwait';net.me=pick;ovShow('<h2>Đã chọn '+pick.n+' '+pick.e+'</h2><p style="color:#dbe6ff">Đang chờ bạn bè chọn bóng…</p>');netSend({k:'pick',id:pick.id});if(net.host&&net.gp)hostStart()}
 function hostStart(){netBot=T.find(t=>t.id===net.gp);net.gp=null;net.me=null;startRound0();netBot=null}
@@ -497,13 +497,19 @@ function onMsg(d){
   else if(d.k==='next')choose();
   else if(d.k==='over')showOver(!d.hw)}}
 function doLock(){if(!net){launch();return}const my=net.host?me:bot;if(!my||my.lk)return;my.lk=true;if(!net.host)netSend({k:'lock'})}
-function ser(o){const d={};for(const k in o){const v=o[k];if(k==='t')d.tid=v.id;else if(k==='lat')d.lat=!!v;else if(k==='kids')d.kids=v.map(ser);else if(k==='sn'||k==='ek')continue;else if(typeof v==='number'||typeof v==='boolean'||typeof v==='string')d[k]=v;else if(Array.isArray(v)&&(k==='tr'||k==='segs'||k==='els'))d[k]=v}return d}
+function ser(o){const d={};for(const k in o){const v=o[k];if(k==='t')d.tid=v.id;else if(k==='lat')d.lat=!!v;else if(k==='kids')d.kids=v.map(ser);else if(k==='sn'||k==='ek')continue;else if(typeof v==='number'||typeof v==='boolean'||typeof v==='string')d[k]=v;else if(Array.isArray(v)&&(k==='segs'||k==='els'))d[k]=v}return d}
 function des(d){const o=Object.assign({},d);o.t=T.find(t=>t.id===d.tid);o.lat=d.lat?{}:null;if(d.kids)o.kids=d.kids.map(des);return o}
+const rd2=o=>JSON.parse(JSON.stringify(o,(k,v)=>typeof v==='number'?Math.round(v*100)/100:v));
 function snap(){const xy=a=>a.map(q=>({x:q.x,y:q.y,l:q.l}));
- return{k:'s',m:mode,lv:lives,a:aimT,g:msg,me:ser(me),bot:ser(bot),pr:proj.map(q=>({x:q.x,y:q.y,c:q.c,b:q.b,ex:q.ex,vx:q.vx,vy:q.vy})),mt:meteors.map(q=>({x:q.x,y:q.y,l:q.l})),to:tors.map(q=>({x:q.x,y:q.y,l:q.l})),wb:xy(webs),ic:xy(ices),fi:xy(fires),mn:mines.map(q=>({x:q.x,y:q.y,l:q.l,s:q.o.side})),po:portals,bo:bolts,ho:xy(holes),bm:booms.map(q=>({x:q.x,y:q.y,t:q.t,s:q.o.side})),bc:beams,fx:fx,tx:texts}}
+ return rd2({k:'s',m:mode,lv:lives,a:aimT,g:msg,me:ser(me),bot:ser(bot),pr:proj.map(q=>({x:q.x,y:q.y,c:q.c,b:q.b,ex:q.ex,vx:q.vx,vy:q.vy})),mt:meteors.map(q=>({x:q.x,y:q.y,l:q.l})),to:tors.map(q=>({x:q.x,y:q.y,l:q.l})),wb:xy(webs),ic:xy(ices),fi:xy(fires),mn:mines.map(q=>({x:q.x,y:q.y,l:q.l,s:q.o.side})),po:portals,bo:bolts,ho:xy(holes),bm:booms.map(q=>({x:q.x,y:q.y,t:q.t,s:q.o.side})),bc:beams,fx:fx,tx:texts})}
+function netHud(){
+ let e=$('nh');if(!e){e=document.createElement('div');e.id='nh';e.style.cssText='position:absolute;left:8px;top:6px;z-index:6;font-size:11px;color:#fff;opacity:.7;pointer-events:none;text-shadow:0 1px 2px #000';ov.parentNode.appendChild(e)}
+ if(!net||!net.ok||!(mode==='aim'||mode==='fight'||mode==='end')){e.style.display='none';return}
+ const t=Date.now();if(!net.rt)net.rt=t;if(t-net.rt>=1000){net.rate=net.rc||0;net.rc=0;net.rt=t}
+ e.style.display='block';e.textContent=(net.via==='p2p'?'🟢 Trực tiếp':net.via==='relay'?'🟠 Qua relay':'🟡 Cùng máy')+(net.host?'':' · '+(net.rate||0)+' gói/s')}
 function extrap(){/* người vào phòng: dự đoán chuyển động giữa 2 lần nhận dữ liệu để mượt hơn */
  [me,bot].forEach(o=>{if(!o||o.lat||o.hp<=0)return;const R=o.r||34,lo=AX+R+5,hi=AX+S-R-5;
-  o.x+=o.vx||0;o.y+=o.vy||0;
+  o.x+=o.vx||0;o.y+=o.vy||0;(o.tr=o.tr||[]).push({x:o.x,y:o.y});if(o.tr.length>10)o.tr.shift();
   if(o.x<lo){o.x=lo;o.vx=Math.abs(o.vx)}else if(o.x>hi){o.x=hi;o.vx=-Math.abs(o.vx)}
   if(o.y<lo){o.y=lo;o.vy=Math.abs(o.vy)}else if(o.y>hi){o.y=hi;o.vy=-Math.abs(o.vy)}});
  (proj||[]).forEach(q=>{q.x+=q.vx||0;q.y+=q.vy||0})}
@@ -511,7 +517,9 @@ function applySnap(d){
  if(mode==='choose'||mode==='lobby'||mode==='over'||mode==='fmenu'||mode==='fwait')return;
  if(d.m==='aim'&&mode!=='aim'){ov.innerHTML='';localAim=null}
  mode=d.m;lives=d.lv;aimT=d.a;msg=d.g==='ROUND WON'?'ROUND LOST':d.g==='ROUND LOST'?'ROUND WON':d.g;
+ if(net)net.rc=(net.rc||0)+1;
  const la=localAim,pm=me,pb=bot;me=des(d.me);bot=des(d.bot);
+ [[pm,me],[pb,bot]].forEach(([a,b])=>{b.tr=(a&&a.tr)||[]});
  if(mode==='fight'){[[pm,me],[pb,bot]].forEach(([a,b])=>{if(a&&b&&!b.lat&&Math.hypot(b.x-a.x,b.y-a.y)<60){b.x=a.x+(b.x-a.x)*.5;b.y=a.y+(b.y-a.y)*.5}})}
 if(mode==='aim'){if(la==null)localAim=bot.aim;else bot.aim=la}
  proj=d.pr;meteors=d.mt||[];tors=d.to||[];webs=d.wb;ices=d.ic;fires=d.fi;mines=d.mn.map(q=>({...q,o:q.s?bot:me}));portals=d.po;bolts=d.bo;holes=d.ho;booms=d.bm.map(q=>({...q,o:q.s?bot:me}));beams=d.bc;fx=d.fx;texts=d.tx;parts=[]}
@@ -847,7 +855,7 @@ cv.addEventListener('pointermove',aimTo);
 cv.addEventListener('pointerdown',e=>{if(mode!=='aim')return;const[x,y]=pos(e);{const mi=net&&!net.host?1:0;if(Math.hypot(x-(mi?W-164:164),y-452)<=46)doLock();else aimTo(e)}});
 addEventListener('keydown',e=>{if(e.target&&/^(INPUT|TEXTAREA)$/.test(e.target.tagName))return;if(e.key==='l'||e.key==='L'){if(mode==='aim')doLock()}});
 $('lb').onclick=lobby;
-(function loop(){update();if(net&&!net.host&&mode==='fight')extrap();if(net&&net.host&&net.ok&&(mode==='aim'||mode==='fight'||mode==='end')&&(++net.f%2===0))netSend(snap());draw();chat.vis();$('lb').style.display=(mode==='choose'||mode==='aim'||mode==='fight'||mode==='end'||mode==='shop'||mode==='netwait')?'block':'none';$('lb').textContent=mode==='shop'?'✕ Thoát cửa hàng':'⌂ Về sảnh';requestAnimationFrame(loop)})();
+(function loop(){update();netHud();if(net&&!net.host&&mode==='fight')extrap();if(net&&net.host&&net.ok&&(mode==='aim'||mode==='fight'||mode==='end')&&(++net.f%2===0))netSend(snap());draw();chat.vis();$('lb').style.display=(mode==='choose'||mode==='aim'||mode==='fight'||mode==='end'||mode==='shop'||mode==='netwait')?'block':'none';$('lb').textContent=mode==='shop'?'✕ Thoát cửa hàng':'⌂ Về sảnh';requestAnimationFrame(loop)})();
 boot();
 })();
 </script></body></html>
