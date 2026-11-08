@@ -73,6 +73,13 @@ button.b{background:#6a7bff;box-shadow:0 4px 0 #3a468f}
 .lg button{width:100%;padding:2.2cqh .8cqw;font-size:clamp(12px,3.6cqh,20px)}
 .lg .wide{grid-column:1/-1;justify-self:start;width:calc(50% + .8cqw)}
 .la{margin-top:2.2cqh;padding:3px 6px;background:none;box-shadow:none;font-size:11px;opacity:.65;color:#dbe6ff}
+/* ---- Mobile portrait: xoay game ngang ---- */
+@media (orientation:portrait) and (pointer:coarse){
+ .wrap{position:fixed;top:0;left:0;width:100dvh;height:100vw;transform-origin:top left;transform:translateX(100vw) rotate(90deg)}
+ .stage{width:min(100dvh,calc(100vw*900/560));height:min(100vw,calc(100dvh*560/900))}
+ .card{width:min(28dvh,170px)}
+ #chatPanel{width:min(340px,calc(100dvh - 24px));height:min(450px,74vw)}
+}
 </style></head><body>
 <div class="wrap"><div class="stage"><canvas id="c" width="900" height="560"></canvas><div id="ov"></div><button class="b" id="lb">⌂ Về sảnh</button></div><button id="fsBtn" type="button" title="Toàn màn hình">⛶</button><button id="chatToggle" type="button"><span id="chatLbl">💬 Trò chuyện</span><span id="chatBadge"></span></button><section id="chatPanel"><div id="chatHead"><div id="chatTitle"><b id="chatTtl">💬 Trò chuyện sảnh</b><small id="chatStat">⏳ Đang kết nối…</small></div><button id="chatClose" type="button">✕</button></div><div id="chatLog" aria-live="polite"></div><div id="chatTyp"></div><div id="chatRep"><div><b></b><span></span></div><button type="button" id="chatRepX">✕</button></div><form id="chatForm"><input id="chatInput" maxlength="180" autocomplete="off" placeholder="Aa" /><button type="submit" id="chatSend">👍</button></form></section></div>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -98,12 +105,12 @@ const T=[
 {id:'fire',n:'Fire Ball',e:'🔥',rar:'Hiếm',rc:'#4db8ff',hp:110,p:250,c:'#c0501a',d:'Để lại vệt lửa 3 giây. Địch chạm lửa hoặc va chạm sẽ bị bỏng mất máu dần. Mỗi 5 giây bùng cháy diện rộng.'},
 {id:'ghost',n:'Ghost Ball',e:'👻',rar:'Huyền thoại',rc:'#ffb020',hp:105,p:450,c:'#8a94b8',d:'Cứ 3 giây lại tàng hình thật 2 giây: chỉ bạn nhìn thấy bóng, đối thủ không thấy gì. Né đạn và laser, cú va chạm đầu tiên khi tàng hình gây gấp đôi sát thương.'},
 {id:'snake',n:'Snake Ball',e:'🐍',rar:'Hiếm',rc:'#4db8ff',hp:105,p:200,c:'#3a8a3a',d:'Thân rắn dài kéo theo sau, địch chạm vào thân hoặc bị cắn đều dính độc.'},
-{id:'ninja',n:'Ninja Ball',e:'🐱‍👤',rar:'Sử thi',rc:'#c070ff',hp:95,p:300,c:'#2a2f45',d:'Mỗi 2 giây phi 3 phi tiêu quạt về phía địch, phi tiêu nảy tường 2 lần.'},
+{id:'ninja',n:'Ninja Ball',e:'🥷',rar:'Sử thi',rc:'#c070ff',hp:95,p:300,c:'#2a2f45',d:'Mỗi 2 giây phi 3 phi tiêu quạt về phía địch, phi tiêu nảy tường 2 lần.'},
 {id:'ki',n:'Ki Ball',e:'🥋',rar:'Sử thi',rc:'#c070ff',hp:100,p:400,c:'#e07a1a',d:'Mỗi 5 giây dồn khí: tăng 25% sức mạnh (tối đa 4 lần, hào quang vàng) và bắn một quả cầu khí.'},
 {id:'mirror',n:'Mirror Eye Ball',e:'👁️',rar:'Huyền thoại',rc:'#ffb020',hp:100,p:500,c:'#a01828',d:'Mỗi 4 giây mở mắt thần 1,5 giây: không nhận sát thương, phản lại 80% cho địch.'},
 {id:'magnet',n:'Magnet Ball',e:'🧲',rar:'Hiếm',rc:'#4db8ff',hp:110,p:200,c:'#b02a2a',d:'Mỗi 5 giây bật từ trường 1 giây, hút địch lao thẳng về phía mình.'},
 {id:'blackhole',n:'Black Hole Ball',e:'🕳️',rar:'Huyền thoại',rc:'#ffb020',hp:100,p:500,c:'#241a3a',d:'Mỗi 6 giây mở hố đen tại chỗ địch đứng, hút địch vào và gây sát thương trong 3 giây.'},
-{id:'boomer',n:'Boomerang Ball',e:'〽',rar:'Hiếm',rc:'#4db8ff',hp:105,p:250,c:'#b8803a',d:'Ném boomerang bay ra rồi quay về, gây sát thương cả lúc đi lẫn lúc về.'},
+{id:'boomer',n:'Boomerang Ball',e:'🪃',rar:'Hiếm',rc:'#4db8ff',hp:105,p:250,c:'#b8803a',d:'Ném boomerang bay ra rồi quay về, gây sát thương cả lúc đi lẫn lúc về.'},
 {id:'phoenix',n:'Phoenix Ball',e:'🦅',rar:'Huyền thoại',rc:'#ffb020',hp:95,p:550,c:'#d05a1a',d:'Va chạm gây bỏng. Chết lần đầu sẽ hồi sinh với 60% máu và thiêu đốt địch xung quanh.'},
 {id:'samurai',n:'Samurai Ball',e:'🗡️',rar:'Sử thi',rc:'#c070ff',hp:100,p:350,c:'#7a2a2a',d:'Mỗi 3 giây rút kiếm lướt xuyên địch, chém trúng gây 14 sát thương.'},
 {id:'drake',n:'Drake Ball',e:'🐉',rar:'Sử thi',rc:'#c070ff',hp:105,p:400,c:'#2a8a5a',d:'Mỗi 3 giây phun 5 quả cầu lửa hình quạt, trúng địch sẽ bị bỏng.'},
@@ -143,7 +150,7 @@ function sha(str){
 const IS='padding:11px;font-size:17px;border-radius:10px;border:0;text-align:center;width:min(260px,80vw);margin:5px 0;outline:none';
 function authMenu(tab,msg){
  mode='auth';tab=tab||'in';
- ovShow('<h2 style="font-size:clamp(26px,6vw,46px);color:#ffd84a;margin:0 0 10px">👑BallVsBallKing</h2><div style="margin:0 0 10px"><button class="'+(tab==='in'?'':'b')+'" id="t1">ĐĂNG NHẬP</button> <button class="'+(tab==='up'?'':'b')+'" id="t2">ĐĂNG KÝ</button></div><div><input id="un" placeholder="Tên tài khoản" maxlength="16" autocomplete="username" style="'+IS+'"></div><div><input id="pw" type="password" placeholder="Mật khẩu" autocomplete="'+(tab==='in'?'current-password':'new-password')+'" style="'+IS+'"></div>'+(tab==='up'?'<div><input id="pw2" type="password" placeholder="Nhập lại mật khẩu" autocomplete="new-password" style="'+IS+'"></div>':'')+'<div id="er" style="color:#ff8a8a;min-height:24px;margin:6px 0">'+(msg||'')+'</div><button id="ok">'+(tab==='in'?'VÀO GAME':'TẠO TÀI KHOẢN')+'</button> <button class="b" id="gs">CHƠI KHÁCH</button><p style="margin:12px 0 0;font-size:12px;color:#cfe0ff">Mỗi tài khoản có dữ liệu riêng (xu, kim cương, bóng đã mua). Dữ liệu lưu ngay trên trình duyệt này.</p>');
+ ovShow('<h2 style="font-size:clamp(26px,6vw,46px);color:#ffd84a;margin:0 0 10px">👑 BallVsBallKing</h2><div style="margin:0 0 10px"><button class="'+(tab==='in'?'':'b')+'" id="t1">ĐĂNG NHẬP</button> <button class="'+(tab==='up'?'':'b')+'" id="t2">ĐĂNG KÝ</button></div><div><input id="un" placeholder="Tên tài khoản" maxlength="16" autocomplete="username" style="'+IS+'"></div><div><input id="pw" type="password" placeholder="Mật khẩu" autocomplete="'+(tab==='in'?'current-password':'new-password')+'" style="'+IS+'"></div>'+(tab==='up'?'<div><input id="pw2" type="password" placeholder="Nhập lại mật khẩu" autocomplete="new-password" style="'+IS+'"></div>':'')+'<div id="er" style="color:#ff8a8a;min-height:24px;margin:6px 0">'+(msg||'')+'</div><button id="ok">'+(tab==='in'?'VÀO GAME':'TẠO TÀI KHOẢN')+'</button> <button class="b" id="gs">CHƠI KHÁCH</button><p style="margin:12px 0 0;font-size:12px;color:#cfe0ff">Mỗi tài khoản có dữ liệu riêng (xu, kim cương, bóng đã mua). Dữ liệu lưu ngay trên trình duyệt này.</p>');
  $('t1').onclick=()=>authMenu('in');$('t2').onclick=()=>authMenu('up');$('gs').onclick=()=>{acct=null;try{localStorage.removeItem('bvb_session')}catch(e){}loadGuest();lobby()};
  $('ok').onclick=()=>authSubmit(tab);
  ['un','pw','pw2'].forEach(i=>{const el=$(i);if(el)el.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter')$('ok').onclick()}})}
@@ -731,7 +738,8 @@ function draw(){
  ctx.textAlign='center';ctx.font='bold 20px system-ui';texts.forEach(t=>{ctx.globalAlpha=Math.min(1,t.t/20);ctx.fillStyle=t.g?'#2fe06a':'#ff3030';ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.strokeText(t.s,t.x,t.y);ctx.fillText(t.s,t.x,t.y);ctx.globalAlpha=1});
  if(mode==='end'){ctx.font='900 54px system-ui';ctx.textBaseline='middle';ctx.strokeStyle='#000';ctx.lineWidth=8;ctx.strokeText(msg,AX+S/2,AY+S/2);ctx.fillStyle=msg==='ROUND WON'?'#7dff6a':'#ff5a5a';ctx.fillText(msg,AX+S/2,AY+S/2)}
 }
-function pos(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]}
+const rotQ=matchMedia('(orientation:portrait) and (pointer:coarse)');
+function pos(e){const r=cv.getBoundingClientRect();if(rotQ.matches)return[(e.clientY-r.top)*W/r.height,(r.right-e.clientX)*H/r.width];return[(e.clientX-r.left)*W/r.width,(e.clientY-r.top)*H/r.height]}
 function aimTo(e){if(mode!=='aim')return;const[x,y]=pos(e),my=net&&!net.host?bot:me;if(my.lk)return;my.aim=Math.atan2(y-my.y,x-my.x);if(net&&!net.host){localAim=my.aim;netSend({k:'aim',a:my.aim})}}
 cv.addEventListener('pointermove',aimTo);
 cv.addEventListener('pointerdown',e=>{if(mode!=='aim')return;const[x,y]=pos(e);{const mi=net&&!net.host?1:0;if(Math.hypot(x-(mi?W-164:164),y-452)<=46)doLock();else aimTo(e)}});
