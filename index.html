@@ -188,8 +188,8 @@ const T=[
 {id:'math',g:1,p:1,n:'Math Ball',e:'🧮',rar:'Sử thi',rc:'#c070ff',hp:100,c:'#2a7ab8',d:'Mỗi 4 giây ra đề toán nhanh cho địch, địch có 2 giây để giải. Không giải được hoặc giải sai: nhận sát thương bằng đúng kết quả phép tính. Giải được: bị tê cứng 1 giây và mất 5 máu. Có đồng hồ đếm giây trên bóng. Chỉ nhận từ Sự kiện.'},
 {id:'hack1',g:1,p:1,n:'Hacker Ball 1',e:'💻',rar:'Hiếm',rc:'#4db8ff',hp:100,c:'#0d2b14',d:'Mỗi 3,5 giây phóng một loạt 6 mã lỗi ERROR (404, 0x0, NaN…) vào đối thủ. Chỉ nhận từ Trứng Hacker.'},
 {id:'hack2',g:1,p:1,n:'Hacker Ball 2',e:'🔒',rar:'Sử thi',rc:'#c070ff',hp:105,c:'#143a22',d:'Mỗi 6 giây giam đối thủ trong chiếc lồng 2 giây: bị đứng yên và mất 15 máu. Chỉ nhận từ Trứng Hacker.'},
-{id:'hack3',g:1,p:1,n:'Hacker Ball 3',e:'👾',rar:'Huyền thoại',rc:'#ffb020',hp:95,c:'#1f4d2a',d:'Mỗi 7 giây triệu hồi 2 ảo ảnh lao vào đối thủ trong 6 giây (tối đa 4 cùng lúc). Mỗi 8 giây thêm 2 ảo giác chạy quanh bóng bảo vệ trong 3 giây: chặn đạn và gây sát thương cho địch chạm vào. Chỉ nhận từ Trứng Hacker.'}];
-const ILL={id:'illu',n:'Ảo ảnh',e:'👾',rar:'',hp:12,c:'#2f8f4a',d:''};
+{id:'hack3',g:1,p:1,n:'Hacker Ball 3',e:'👾',rar:'Huyền thoại',rc:'#ffb020',hp:120,c:'#1f4d2a',d:'Mỗi 7 giây triệu hồi 2 ảo ảnh lao vào đối thủ trong 6 giây (tối đa 4 cùng lúc). Mỗi 8 giây thêm 2 ảo giác chạy quanh bóng bảo vệ trong 3 giây: chặn đạn và gây sát thương cho địch chạm vào. Chỉ nhận từ Trứng Hacker.'}];
+const ILL={id:'illu',n:'Ảo ảnh',e:'👾',rar:'',hp:30,c:'#2f8f4a',d:''};
 let mode='lobby',lives=[3,3],gems=6,wins=0,me,bot,pick=null,choices=[],chT=0,aimT=0,locked=false,endT=0,msg='',texts=[],proj=[],webs=[],parts=[],rr=0,coins=0,owned=T.filter(t=>!t.p).map(t=>t.id),beams=[],fx=[],ices=[],allM=false,mines=[],bolts=[],fires=[],portals=[],holes=[],booms=[],net=null,netBot=null,localAim=null,lastSpin=0,meteors=[],tors=[],strikes=[],ptr=null,netPtr=null;
 let acct=null,qs=null,tk=0,isAdm=false,evs=null;
 function applyData(d){evs=d&&d.ev||null;qs=d&&d.qs||null;tk=d&&d.tk||0;lastSpin=d&&d.spin||0;coins=d&&d.coins||0;wins=d&&d.wins||0;gems=d&&d.gems!=null?d.gems:6;owned=d&&d.owned||T.filter(t=>!t.p).map(t=>t.id)}
