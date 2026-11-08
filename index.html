@@ -423,22 +423,62 @@ function joinRoom(code){
  mode='fwait';ovShow('<h2>Đang vào phòng '+code+'…</h2><button class="b" id="cn">HỦY</button>');$('cn').onclick=()=>friendMenu();
  const n=net={host:false,ok:false,t:null,f:0,code};
  openTransport(n,code,false,()=>{n.ok=true},er=>{if(net===n)friendMenu(er)})}
+const ICE=[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},{urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}];
+const MQB=['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt'];
+/* Kết nối phòng: thử P2P (PeerJS) trước; nếu không được thì tự chuyển sang relay qua MQTT (qua được mọi mạng) */
 function openTransport(n,code,host,onOpen,onErr){
  const id='bvbk-'+code,onData=d=>{if(net===n)onMsg(d)},onClose=()=>peerGone(n);
+ const closers=[];let settled=false,dead=false,mqStarted=false;
+ n.t={send:null,close:()=>{dead=true;closers.forEach(f=>{try{f()}catch(e){}})}};
+ const fail=m=>{if(dead||settled)return;n.t.close();onErr(m)};
+ const opened=snd=>{if(dead||settled)return false;settled=true;n.t.send=snd;onOpen();return true};
+ function startMQ(){
+  if(mqStarted||dead||settled)return;mqStarted=true;
+  if(!window.mqtt){
+   if(window.Peer)return;
+   const ch=new BroadcastChannel(id);let open=false,iv=null;
+   closers.push(()=>{clearInterval(iv);ch.close()});
+   const snd=d=>ch.postMessage(d);
+   ch.onmessage=e=>{const d=e.data;if(net!==n)return;
+    if(host&&d.k==='hello'&&!open){open=true;ch.postMessage({k:'welcome'});opened(snd)}
+    else if(!host&&d.k==='welcome'&&!open){open=true;clearInterval(iv);opened(snd)}
+    else if(open&&d.k!=='hello'&&d.k!=='welcome')onData(d)};
+   if(!host)iv=setInterval(()=>ch.postMessage({k:'hello'}),400);
+   return}
+  const uid=Math.random().toString(36).slice(2,10),top='bvbking-9c41e7/room/'+code,cs=[];
+  let q=0,lastQ=0,pid=null,hi=null,lastS=0;
+  const pub=d=>{const m=JSON.stringify({f:uid,q:++q,d});cs.forEach(c=>{try{if(c.connected)c.publish(top,m)}catch(e){}})};
+  const snd=d=>{if(d.k==='s'){const t=Date.now();if(t-lastS<85)return;lastS=t}pub(d)};
+  const onm=raw=>{
+   let o;try{o=JSON.parse(raw)}catch(e){return}
+   if(!o||!o.d||o.f===uid)return;const d=o.d;
+   if(!pid){
+    if(host&&d.k==='hello'&&!settled){pid=o.f;lastQ=o.q;pub({k:'welcome',to:pid});if(!opened(snd))pid=null}
+    else if(!host&&d.k==='welcome'&&d.to===uid&&!settled){pid=o.f;lastQ=o.q;clearInterval(hi);if(!opened(snd))pid=null}
+    return}
+   if(o.f!==pid||o.q<=lastQ)return;lastQ=o.q;
+   if(d.k==='hello'){if(host)pub({k:'welcome',to:pid});return}
+   if(d.k==='welcome')return;
+   onData(d)};
+  MQB.forEach(u=>{try{
+   const c=mqtt.connect(u,{clientId:'bvbk_'+uid+Math.random().toString(36).slice(2,5),clean:true,keepalive:30,reconnectPeriod:4000,connectTimeout:8000,will:{topic:top,payload:JSON.stringify({f:uid,q:1e9,d:{k:'bye'}}),qos:0,retain:false}});
+   cs.push(c);
+   c.on('connect',()=>{c.subscribe(top,{qos:0})});
+   c.on('message',(t,pl)=>onm(typeof pl==='string'?pl:new TextDecoder().decode(pl)));
+   c.on('error',()=>{})}catch(e){}});
+  closers.push(()=>{clearInterval(hi);cs.forEach(c=>{try{c.end(true)}catch(e){}})});
+  if(!host)hi=setInterval(()=>pub({k:'hello'}),700)}
  if(window.Peer){
-  const pr=new Peer(host?id:undefined);n.t={close:()=>{try{pr.destroy()}catch(e){}},send:null};
-  const bind=c=>{n.t.send=d=>{try{c.send(d)}catch(e){}};c.on('data',onData);c.on('close',onClose);c.on('error',onClose)};
-  pr.on('error',e=>onErr(e.type==='unavailable-id'?'Mã bị trùng, hãy thử lại.':e.type==='peer-unavailable'?'Không tìm thấy phòng '+code+'.':'Lỗi kết nối ('+e.type+').'));
-  if(host)pr.on('connection',c=>{if(n.ok)return;c.on('open',()=>{bind(c);onOpen()})});
-  else pr.on('open',()=>{const c=pr.connect(id,{serialization:'json',reliable:true});c.on('open',()=>{bind(c);onOpen()})});
-  return}
- const ch=new BroadcastChannel(id);let open=false,iv=null;
- n.t={send:d=>ch.postMessage(d),close:()=>{clearInterval(iv);ch.close()}};
- ch.onmessage=e=>{const d=e.data;if(net!==n)return;
-  if(host&&d.k==='hello'&&!open){open=true;ch.postMessage({k:'welcome'});onOpen()}
-  else if(!host&&d.k==='welcome'&&!open){open=true;clearInterval(iv);onOpen()}
-  else if(open&&d.k!=='hello'&&d.k!=='welcome')onData(d)};
- if(!host){let tries=0;iv=setInterval(()=>{ch.postMessage({k:'hello'});if(++tries>12){clearInterval(iv);if(!open)onErr('Không tìm thấy phòng '+code+'.')}},400)}}
+  let pr=null;
+  try{pr=new Peer(host?id:undefined,{config:{iceServers:ICE}});closers.push(()=>pr.destroy())}catch(e){pr=null}
+  if(pr){
+   const attach=c=>{c.on('open',()=>{if(opened(d=>{try{c.send(d)}catch(e){}})){c.on('data',onData);c.on('close',onClose);c.on('error',onClose)}else{try{c.close()}catch(e){}}})};
+   pr.on('error',e=>{if(host&&e.type==='unavailable-id')fail('Mã bị trùng, hãy thử lại.');else startMQ()});
+   if(host)pr.on('connection',attach);
+   else pr.on('open',()=>{const c=pr.connect(id,{serialization:'json',reliable:true});attach(c)})}
+ }
+ if(host)startMQ();
+ else{const t1=setTimeout(startMQ,window.Peer?6000:0),t2=setTimeout(()=>fail('Không vào được phòng '+code+'. Kiểm tra mã phòng và mạng rồi thử lại.'),25000);closers.push(()=>{clearTimeout(t1);clearTimeout(t2)})}}
 function peerGone(n){if(net!==n||mode==='over'||mode==='lobby')return;mode='over';ovShow('<h2>Bạn bè đã thoát</h2><button class="b" id="hm">VỀ SẢNH</button>');$('hm').onclick=lobby}
 function netPick(){mode='netwait';net.me=pick;ovShow('<h2>Đã chọn '+pick.n+' '+pick.e+'</h2><p style="color:#dbe6ff">Đang chờ bạn bè chọn bóng…</p>');netSend({k:'pick',id:pick.id});if(net.host&&net.gp)hostStart()}
 function hostStart(){netBot=T.find(t=>t.id===net.gp);net.gp=null;net.me=null;startRound0();netBot=null}
