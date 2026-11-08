@@ -448,7 +448,7 @@ function openTransport(n,code,host,onOpen,onErr){
   const uid=Math.random().toString(36).slice(2,10),top='bvbking-9c41e7/room/'+code,cs=[];
   let q=0,lastQ=0,pid=null,hi=null,lastS=0;
   const pub=d=>{const m=JSON.stringify({f:uid,q:++q,d});cs.forEach(c=>{try{if(c.connected)c.publish(top,m)}catch(e){}})};
-  const snd=d=>{if(d.k==='s'){const t=Date.now();if(t-lastS<85)return;lastS=t}pub(d)};
+  const snd=d=>{if(d.k==='s'){const t=Date.now();if(t-lastS<60)return;lastS=t}pub(d)};
   const onm=raw=>{
    let o;try{o=JSON.parse(raw)}catch(e){return}
    if(!o||!o.d||o.f===uid)return;const d=o.d;
@@ -500,12 +500,20 @@ function doLock(){if(!net){launch();return}const my=net.host?me:bot;if(!my||my.l
 function ser(o){const d={};for(const k in o){const v=o[k];if(k==='t')d.tid=v.id;else if(k==='lat')d.lat=!!v;else if(k==='kids')d.kids=v.map(ser);else if(k==='sn'||k==='ek')continue;else if(typeof v==='number'||typeof v==='boolean'||typeof v==='string')d[k]=v;else if(Array.isArray(v)&&(k==='tr'||k==='segs'||k==='els'))d[k]=v}return d}
 function des(d){const o=Object.assign({},d);o.t=T.find(t=>t.id===d.tid);o.lat=d.lat?{}:null;if(d.kids)o.kids=d.kids.map(des);return o}
 function snap(){const xy=a=>a.map(q=>({x:q.x,y:q.y,l:q.l}));
- return{k:'s',m:mode,lv:lives,a:aimT,g:msg,me:ser(me),bot:ser(bot),pr:proj.map(q=>({x:q.x,y:q.y,c:q.c,b:q.b,ex:q.ex})),mt:meteors.map(q=>({x:q.x,y:q.y,l:q.l})),to:tors.map(q=>({x:q.x,y:q.y,l:q.l})),wb:xy(webs),ic:xy(ices),fi:xy(fires),mn:mines.map(q=>({x:q.x,y:q.y,l:q.l,s:q.o.side})),po:portals,bo:bolts,ho:xy(holes),bm:booms.map(q=>({x:q.x,y:q.y,t:q.t,s:q.o.side})),bc:beams,fx:fx,tx:texts}}
+ return{k:'s',m:mode,lv:lives,a:aimT,g:msg,me:ser(me),bot:ser(bot),pr:proj.map(q=>({x:q.x,y:q.y,c:q.c,b:q.b,ex:q.ex,vx:q.vx,vy:q.vy})),mt:meteors.map(q=>({x:q.x,y:q.y,l:q.l})),to:tors.map(q=>({x:q.x,y:q.y,l:q.l})),wb:xy(webs),ic:xy(ices),fi:xy(fires),mn:mines.map(q=>({x:q.x,y:q.y,l:q.l,s:q.o.side})),po:portals,bo:bolts,ho:xy(holes),bm:booms.map(q=>({x:q.x,y:q.y,t:q.t,s:q.o.side})),bc:beams,fx:fx,tx:texts}}
+function extrap(){/* người vào phòng: dự đoán chuyển động giữa 2 lần nhận dữ liệu để mượt hơn */
+ [me,bot].forEach(o=>{if(!o||o.lat||o.hp<=0)return;const R=o.r||34,lo=AX+R+5,hi=AX+S-R-5;
+  o.x+=o.vx||0;o.y+=o.vy||0;
+  if(o.x<lo){o.x=lo;o.vx=Math.abs(o.vx)}else if(o.x>hi){o.x=hi;o.vx=-Math.abs(o.vx)}
+  if(o.y<lo){o.y=lo;o.vy=Math.abs(o.vy)}else if(o.y>hi){o.y=hi;o.vy=-Math.abs(o.vy)}});
+ (proj||[]).forEach(q=>{q.x+=q.vx||0;q.y+=q.vy||0})}
 function applySnap(d){
  if(mode==='choose'||mode==='lobby'||mode==='over'||mode==='fmenu'||mode==='fwait')return;
  if(d.m==='aim'&&mode!=='aim'){ov.innerHTML='';localAim=null}
  mode=d.m;lives=d.lv;aimT=d.a;msg=d.g==='ROUND WON'?'ROUND LOST':d.g==='ROUND LOST'?'ROUND WON':d.g;
- const la=localAim;me=des(d.me);bot=des(d.bot);if(mode==='aim'){if(la==null)localAim=bot.aim;else bot.aim=la}
+ const la=localAim,pm=me,pb=bot;me=des(d.me);bot=des(d.bot);
+ if(mode==='fight'){[[pm,me],[pb,bot]].forEach(([a,b])=>{if(a&&b&&!b.lat&&Math.hypot(b.x-a.x,b.y-a.y)<60){b.x=a.x+(b.x-a.x)*.5;b.y=a.y+(b.y-a.y)*.5}})}
+if(mode==='aim'){if(la==null)localAim=bot.aim;else bot.aim=la}
  proj=d.pr;meteors=d.mt||[];tors=d.to||[];webs=d.wb;ices=d.ic;fires=d.fi;mines=d.mn.map(q=>({...q,o:q.s?bot:me}));portals=d.po;bolts=d.bo;holes=d.ho;booms=d.bm.map(q=>({...q,o:q.s?bot:me}));beams=d.bc;fx=d.fx;texts=d.tx;parts=[]}
 function showOver(w){mode='over';if(w){wins++;gems+=3;coins+=100;save()}
  ovShow('<h2>'+(w?'🏆 BẠN THẮNG TRẬN!':'💥 BẠN THUA TRẬN')+'</h2><p style="color:#dbe6ff">'+(w?'+100 🪙  +3 💎':'Thử chọn bóng khác nhé.')+'</p>'+(net?'':'<button id="ag">CHƠI TIẾP</button> ')+'<button class="b" id="hm">VỀ SẢNH</button>');
@@ -839,7 +847,7 @@ cv.addEventListener('pointermove',aimTo);
 cv.addEventListener('pointerdown',e=>{if(mode!=='aim')return;const[x,y]=pos(e);{const mi=net&&!net.host?1:0;if(Math.hypot(x-(mi?W-164:164),y-452)<=46)doLock();else aimTo(e)}});
 addEventListener('keydown',e=>{if(e.target&&/^(INPUT|TEXTAREA)$/.test(e.target.tagName))return;if(e.key==='l'||e.key==='L'){if(mode==='aim')doLock()}});
 $('lb').onclick=lobby;
-(function loop(){update();if(net&&net.host&&net.ok&&(mode==='aim'||mode==='fight'||mode==='end')&&(++net.f%2===0))netSend(snap());draw();chat.vis();$('lb').style.display=(mode==='choose'||mode==='aim'||mode==='fight'||mode==='end'||mode==='shop'||mode==='netwait')?'block':'none';$('lb').textContent=mode==='shop'?'✕ Thoát cửa hàng':'⌂ Về sảnh';requestAnimationFrame(loop)})();
+(function loop(){update();if(net&&!net.host&&mode==='fight')extrap();if(net&&net.host&&net.ok&&(mode==='aim'||mode==='fight'||mode==='end')&&(++net.f%2===0))netSend(snap());draw();chat.vis();$('lb').style.display=(mode==='choose'||mode==='aim'||mode==='fight'||mode==='end'||mode==='shop'||mode==='netwait')?'block':'none';$('lb').textContent=mode==='shop'?'✕ Thoát cửa hàng':'⌂ Về sảnh';requestAnimationFrame(loop)})();
 boot();
 })();
 </script></body></html>
